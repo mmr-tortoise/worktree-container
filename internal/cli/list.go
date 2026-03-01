@@ -1,12 +1,13 @@
 // Package cli — list.go implements the "worktree-container list" command.
 //
-// The list command displays all managed worktree environments by querying
-// Docker for containers with the "worktree.managed-by=worktree-container"
-// label. Containers are grouped by environment name and presented as a
-// text table or JSON array, depending on the --json flag.
+// The list command displays all managed worktree environments using a
+// dual-source approach: marker files (.worktree-container) for local
+// worktree discovery, and Docker container labels for live container state.
+// This allows listing environments even when Docker is unavailable.
 //
-// An optional --status flag allows filtering by environment lifecycle state
-// (running, stopped, orphaned, or all).
+// Environments are presented as a text table or JSON array, depending on
+// the --json flag. An optional --status flag allows filtering by lifecycle
+// state (running, stopped, orphaned, no-container, or all).
 package cli
 
 import (
@@ -30,7 +31,7 @@ import (
 // These are bound to cobra flags in NewListCommand.
 type listFlags struct {
 	// status filters environments by their lifecycle state.
-	// Valid values: "running", "stopped", "orphaned", "all" (default).
+	// Valid values: "running", "stopped", "orphaned", "no-container", "all" (default).
 	status string
 }
 
@@ -63,7 +64,7 @@ Examples:
 
 	// Register the --status flag with a default value of "all".
 	cmd.Flags().StringVar(&flags.status, "status", "all",
-		"Filter by status: running, stopped, orphaned, all (default: all)")
+		"Filter by status: running, stopped, orphaned, no-container, all (default: all)")
 
 	return cmd
 }

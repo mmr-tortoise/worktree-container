@@ -113,6 +113,15 @@ func runRemove(ctx context.Context, envName string, flags *removeFlags) error {
 	// PatternNone environments have no containers to remove — only the
 	// Git worktree cleanup in Step 5 is needed.
 	if env.ConfigPattern != model.PatternNone {
+		// Guard against nil Docker client for non-None patterns.
+		// If Docker is not available but the environment requires containers,
+		// return a clear error instead of proceeding to panic on Docker SDK calls.
+		if cli == nil {
+			return model.WrapCLIError(model.ExitDockerNotRunning,
+				fmt.Sprintf("Docker is required to remove environment %q (pattern: %s) but is not available",
+					envName, env.ConfigPattern), nil)
+		}
+
 		if env.ConfigPattern.IsCompose() {
 			// Pattern C/D: Use docker compose down with volume removal.
 			// This removes containers, networks, and named volumes in one operation.

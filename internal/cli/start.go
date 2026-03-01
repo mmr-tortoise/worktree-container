@@ -105,6 +105,15 @@ func runStart(ctx context.Context, envName string) error {
 		return nil
 	}
 
+	// Step 2.6: Guard against nil Docker client for non-None patterns.
+	// If Docker is not available but the environment requires containers,
+	// return a clear error instead of proceeding to panic on Docker SDK calls.
+	if cli == nil {
+		return model.WrapCLIError(model.ExitDockerNotRunning,
+			fmt.Sprintf("Docker is required to start environment %q (pattern: %s) but is not available",
+				envName, env.ConfigPattern), nil)
+	}
+
 	// Step 3: Verify port availability before starting.
 	// This prevents starting containers that would fail to bind ports or
 	// silently shadow other services already using those ports.

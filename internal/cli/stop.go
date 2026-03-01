@@ -82,6 +82,15 @@ func runStop(ctx context.Context, envName string) error {
 		return nil
 	}
 
+	// Step 2.6: Guard against nil Docker client for non-None patterns.
+	// If Docker is not available but the environment requires containers,
+	// return a clear error instead of proceeding to panic on Docker SDK calls.
+	if cli == nil {
+		return model.WrapCLIError(model.ExitDockerNotRunning,
+			fmt.Sprintf("Docker is required to stop environment %q (pattern: %s) but is not available",
+				envName, env.ConfigPattern), nil)
+	}
+
 	// Step 3: Stop containers based on the configuration pattern.
 	if env.ConfigPattern.IsCompose() {
 		// Pattern C/D: Use docker compose stop for coordinated shutdown.
