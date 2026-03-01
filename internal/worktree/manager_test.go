@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/mmr-tortoise/worktree-container/internal/model"
 )
 
 // setupTestRepo creates a temporary directory with an initialized Git repository
@@ -70,7 +72,7 @@ func TestWriteAndReadMarkerFile(t *testing.T) {
 		Name:           "feature-auth",
 		Branch:         "feature/auth",
 		SourceRepoPath: "/path/to/repo",
-		ConfigPattern:  "none",
+		ConfigPattern:  model.PatternNone,
 		CreatedAt:      "2026-03-02T00:00:00Z",
 	}
 

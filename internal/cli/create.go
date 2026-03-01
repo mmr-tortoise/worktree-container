@@ -5,14 +5,17 @@
 // its associated Dev Container environment with shifted ports.
 //
 // Orchestration steps:
-//  1. Validate inputs and detect source repository
-//  2. Create Git worktree (or use existing one)
-//  3. Find and parse devcontainer.json
-//  4. Detect configuration pattern (A/B/C/D)
-//  5. Allocate shifted ports based on worktree index
-//  6. Copy and rewrite devcontainer configuration
-//  7. Start containers (unless --no-start)
-//  8. Output results (text or JSON)
+//  1. Determine source repository path
+//  2. Determine environment name
+//  3. Determine worktree path
+//  4. Create Git worktree
+//  5. Place marker file (initial PatternNone)
+//  6. Find and parse devcontainer.json
+//  7. Detect configuration pattern (A/B/C/D) and update marker
+//  8. Extract and allocate shifted ports
+//  9. Build labels and copy/rewrite devcontainer configuration
+//  10. Start containers (unless --no-start)
+//  11. Output results (text or JSON)
 package cli
 
 import (
@@ -133,7 +136,7 @@ func runCreate(ctx context.Context, branchName string, flags *createFlags) error
 	}
 	VerboseLog("Git worktree created successfully")
 
-	// Step 4.5: Place marker file with initial configPattern=none.
+	// Step 5: Place marker file with initial configPattern=none.
 	// The marker file is always created first with PatternNone, then updated
 	// to the actual pattern after devcontainer.json detection and processing.
 	// This ensures the worktree is tracked even if the process is interrupted.
@@ -142,7 +145,7 @@ func runCreate(ctx context.Context, branchName string, flags *createFlags) error
 		Name:           envName,
 		Branch:         branchName,
 		SourceRepoPath: repoRoot,
-		ConfigPattern:  string(model.PatternNone),
+		ConfigPattern:  model.PatternNone,
 		CreatedAt:      time.Now().UTC().Format(time.RFC3339),
 	}
 	if writeErr := worktree.WriteMarkerFile(worktreePath, marker); writeErr != nil {
@@ -150,7 +153,7 @@ func runCreate(ctx context.Context, branchName string, flags *createFlags) error
 	}
 	VerboseLog("Marker file written to worktree")
 
-	// Step 5: Find devcontainer.json in the source repo.
+	// Step 6: Find devcontainer.json in the source repo.
 	// We look in the source repo (not the worktree) for the original config,
 	// as the worktree might not have .devcontainer/ yet.
 	devcontainerPath, err := devcontainer.FindDevContainerJSON(repoRoot)
@@ -189,7 +192,7 @@ func runCreate(ctx context.Context, branchName string, flags *createFlags) error
 		return model.WrapCLIError(model.ExitDevContainerNotFound, "failed to read devcontainer.json", err)
 	}
 
-	// Step 6: Detect configuration pattern.
+	// Step 7: Detect configuration pattern.
 	// For Compose patterns, we need to count services from the Compose file.
 	composeServiceCount := 0
 	composeFiles := devcontainer.GetComposeFiles(rawConfig)
@@ -200,16 +203,16 @@ func runCreate(ctx context.Context, branchName string, flags *createFlags) error
 	pattern := devcontainer.DetectPattern(rawConfig, composeServiceCount)
 	VerboseLog("Detected pattern: %s", pattern)
 
-	// Step 6.5: Update the marker file with the detected config pattern.
-	// The marker was initially created with PatternNone in Step 4.5;
+	// Step 7.5: Update the marker file with the detected config pattern.
+	// The marker was initially created with PatternNone in Step 5;
 	// now that we know the actual pattern, update it.
-	marker.ConfigPattern = pattern.String()
+	marker.ConfigPattern = pattern
 	if updateErr := worktree.WriteMarkerFile(worktreePath, marker); updateErr != nil {
 		return model.WrapCLIError(model.ExitGeneralError, "failed to update marker file", updateErr)
 	}
 	VerboseLog("Marker file updated with pattern: %s", pattern)
 
-	// Step 7: Extract ports and allocate shifted ports.
+	// Step 8: Extract ports and allocate shifted ports.
 	defaultServiceName := envName
 	if rawConfig.Service != "" {
 		defaultServiceName = rawConfig.Service
@@ -245,7 +248,7 @@ func runCreate(ctx context.Context, branchName string, flags *createFlags) error
 		VerboseLog("Port allocated: %s", pa.String())
 	}
 
-	// Step 8: Build labels for the environment.
+	// Step 9: Build labels for the environment.
 	env := &model.WorktreeEnv{
 		Name:            envName,
 		Branch:          branchName,
@@ -258,7 +261,7 @@ func runCreate(ctx context.Context, branchName string, flags *createFlags) error
 	}
 	labels := docker.BuildLabels(env)
 
-	// Step 9: Copy .devcontainer directory and rewrite configuration.
+	// Step 9.5: Copy .devcontainer directory and rewrite configuration.
 	srcDevcontainerDir := filepath.Dir(devcontainerPath)
 	dstDevcontainerDir := filepath.Join(worktreePath, ".devcontainer")
 

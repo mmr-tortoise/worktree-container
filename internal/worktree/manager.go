@@ -51,10 +51,10 @@ type MarkerFile struct {
 	SourceRepoPath string `json:"sourceRepoPath"`
 
 	// ConfigPattern records the detected devcontainer.json pattern.
-	// Initially set to "none" when no devcontainer.json is found,
+	// Initially set to PatternNone when no devcontainer.json is found,
 	// then updated to the actual pattern (image, dockerfile, etc.)
 	// once the container configuration is processed.
-	ConfigPattern string `json:"configPattern"`
+	ConfigPattern model.ConfigPattern `json:"configPattern"`
 
 	// CreatedAt is the ISO 8601 timestamp when this environment was created.
 	CreatedAt string `json:"createdAt"`

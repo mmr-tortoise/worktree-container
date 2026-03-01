@@ -116,9 +116,10 @@ func runList(ctx context.Context, flags *listFlags) error {
 			// Parse the creation timestamp from the marker file.
 			createdAt, _ := time.Parse(time.RFC3339, marker.CreatedAt)
 
-			// Parse config pattern from marker, defaulting to PatternNone.
-			configPattern, parseErr := model.ParseConfigPattern(marker.ConfigPattern)
-			if parseErr != nil {
+			// Use config pattern from marker directly (typed as model.ConfigPattern).
+			// Default to PatternNone if the stored value is invalid.
+			configPattern := marker.ConfigPattern
+			if !configPattern.IsValid() {
 				configPattern = model.PatternNone
 			}
 

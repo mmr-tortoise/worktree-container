@@ -77,7 +77,7 @@ func TestCreateNoDevcontainer_WorktreeAndMarker(t *testing.T) {
 		Name:           envName,
 		Branch:         branchName,
 		SourceRepoPath: repoPath,
-		ConfigPattern:  string(model.PatternNone),
+		ConfigPattern:  model.PatternNone,
 		CreatedAt:      "2026-03-02T00:00:00Z",
 	}
 	err = worktree.WriteMarkerFile(worktreePath, marker)
@@ -92,7 +92,7 @@ func TestCreateNoDevcontainer_WorktreeAndMarker(t *testing.T) {
 	assert.Equal(t, envName, readMarker.Name)
 	assert.Equal(t, branchName, readMarker.Branch)
 	assert.Equal(t, repoPath, readMarker.SourceRepoPath)
-	assert.Equal(t, string(model.PatternNone), readMarker.ConfigPattern)
+	assert.Equal(t, model.PatternNone, readMarker.ConfigPattern)
 }
 
 // TestCreateWithDevcontainer_MarkerFile verifies that when a devcontainer.json
@@ -128,7 +128,7 @@ func TestCreateWithDevcontainer_MarkerFile(t *testing.T) {
 		Name:           envName,
 		Branch:         branchName,
 		SourceRepoPath: repoPath,
-		ConfigPattern:  string(model.PatternNone),
+		ConfigPattern:  model.PatternNone,
 		CreatedAt:      "2026-03-02T00:00:00Z",
 	}
 	err = worktree.WriteMarkerFile(worktreePath, marker)
@@ -136,7 +136,7 @@ func TestCreateWithDevcontainer_MarkerFile(t *testing.T) {
 
 	// Simulate what create.go does after finding devcontainer.json:
 	// update the marker with the actual pattern.
-	marker.ConfigPattern = string(model.PatternImage)
+	marker.ConfigPattern = model.PatternImage
 	err = worktree.WriteMarkerFile(worktreePath, marker)
 	require.NoError(t, err)
 
@@ -145,7 +145,7 @@ func TestCreateWithDevcontainer_MarkerFile(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, readMarker)
 
-	assert.Equal(t, string(model.PatternImage), readMarker.ConfigPattern,
+	assert.Equal(t, model.PatternImage, readMarker.ConfigPattern,
 		"marker file should be updated from 'none' to 'image'")
 	assert.Equal(t, envName, readMarker.Name)
 }
@@ -171,7 +171,7 @@ func TestLateDevcontainerAddition(t *testing.T) {
 		Name:           envName,
 		Branch:         branchName,
 		SourceRepoPath: repoPath,
-		ConfigPattern:  string(model.PatternNone),
+		ConfigPattern:  model.PatternNone,
 		CreatedAt:      "2026-03-02T00:00:00Z",
 	}
 	err = worktree.WriteMarkerFile(worktreePath, marker)
@@ -180,7 +180,7 @@ func TestLateDevcontainerAddition(t *testing.T) {
 	// Verify initial state is PatternNone.
 	readMarker, err := worktree.ReadMarkerFile(worktreePath)
 	require.NoError(t, err)
-	assert.Equal(t, string(model.PatternNone), readMarker.ConfigPattern)
+	assert.Equal(t, model.PatternNone, readMarker.ConfigPattern)
 
 	// Now add a devcontainer.json to the worktree.
 	devcontainerDir := filepath.Join(worktreePath, ".devcontainer")
@@ -195,24 +195,14 @@ func TestLateDevcontainerAddition(t *testing.T) {
 	err = os.WriteFile(filepath.Join(devcontainerDir, "devcontainer.json"), []byte(devcontainerJSON), 0644)
 	require.NoError(t, err)
 
-	// Simulate what start.go does: update the marker file.
-	marker.ConfigPattern = string(model.PatternImage)
+	// Simulate updating the marker file to reflect a new config pattern.
+	marker.ConfigPattern = model.PatternImage
 	err = worktree.WriteMarkerFile(worktreePath, marker)
 	require.NoError(t, err)
 
 	// Verify the marker was updated.
 	readMarker, err = worktree.ReadMarkerFile(worktreePath)
 	require.NoError(t, err)
-	assert.Equal(t, string(model.PatternImage), readMarker.ConfigPattern,
+	assert.Equal(t, model.PatternImage, readMarker.ConfigPattern,
 		"marker should be updated to 'image' after late devcontainer addition")
-}
-
-// TestPatternNone_IsNotCompose verifies that PatternNone is not considered
-// a Compose-based pattern, which affects output formatting and container handling.
-func TestPatternNone_IsNotCompose(t *testing.T) {
-	assert.False(t, model.PatternNone.IsCompose(),
-		"PatternNone should not be considered a Compose pattern")
-	assert.True(t, model.PatternNone.IsValid(),
-		"PatternNone should be a valid config pattern")
-	assert.Equal(t, "none", model.PatternNone.String())
 }

@@ -20,7 +20,8 @@ import (
 // WorktreeStatus represents the lifecycle state of a worktree environment.
 // The state transitions are:
 //
-//	[Created] → Running → Stopped ⇄ Running → [Deleted]
+//	[Created with devcontainer] → Running → Stopped ⇄ Running → [Deleted]
+//	[Created without devcontainer] → NoContainer → [Deleted]
 //	Running/Stopped → Orphaned (when Git worktree is manually deleted)
 type WorktreeStatus string
 
@@ -162,7 +163,7 @@ type WorktreeEnv struct {
 	// Status is the current lifecycle state of the environment.
 	Status WorktreeStatus `json:"status"`
 
-	// ConfigPattern indicates which devcontainer.json pattern (A/B/C/D) is used.
+	// ConfigPattern indicates which devcontainer.json pattern (A/B/C/D/None) is used.
 	ConfigPattern ConfigPattern `json:"configPattern"`
 
 	// Containers holds information about all Docker containers belonging

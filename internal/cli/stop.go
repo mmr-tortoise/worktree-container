@@ -226,8 +226,11 @@ func findEnvironmentFromMarker(envName string) (*model.WorktreeEnv, error) {
 
 		// Found a matching marker — build a WorktreeEnv from it.
 		createdAt, _ := time.Parse(time.RFC3339, marker.CreatedAt)
-		configPattern, parseErr := model.ParseConfigPattern(marker.ConfigPattern)
-		if parseErr != nil {
+
+		// Use config pattern from marker directly (typed as model.ConfigPattern).
+		// Default to PatternNone if the stored value is invalid.
+		configPattern := marker.ConfigPattern
+		if !configPattern.IsValid() {
 			configPattern = model.PatternNone
 		}
 
