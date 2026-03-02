@@ -502,6 +502,9 @@ func printCreateResultJSON(env *model.WorktreeEnv) {
 		WorktreePath:  env.WorktreePath,
 		Status:        env.Status.String(),
 		ConfigPattern: env.ConfigPattern.String(),
+		// Initialize with an empty slice so JSON output shows [] instead of null
+		// when no services are present.
+		Services: make([]serviceJSON, 0),
 	}
 
 	for _, pa := range env.PortAllocations {

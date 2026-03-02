@@ -220,6 +220,11 @@ func findEnvironmentFromMarker(envName string) (*model.WorktreeEnv, error) {
 			continue
 		}
 
+		// Skip markers not written by this tool.
+		if marker.ManagedBy != "worktree-container" {
+			continue
+		}
+
 		if marker.Name != envName {
 			continue
 		}
@@ -231,10 +236,12 @@ func findEnvironmentFromMarker(envName string) (*model.WorktreeEnv, error) {
 		}
 
 		// Use config pattern from marker directly (typed as model.ConfigPattern).
-		// Default to PatternNone if the stored value is invalid.
+		// Skip markers with invalid config patterns instead of silently falling
+		// back to PatternNone, which could mask data corruption.
 		configPattern := marker.ConfigPattern
 		if !configPattern.IsValid() {
-			configPattern = model.PatternNone
+			VerboseLog("Warning: ignoring marker at %s for %q due to invalid configPattern %q", wtPath, envName, marker.ConfigPattern)
+			continue
 		}
 
 		// Determine status heuristically based on config pattern.

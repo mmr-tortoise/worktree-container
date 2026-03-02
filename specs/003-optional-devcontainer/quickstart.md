@@ -42,18 +42,21 @@ worktree-container remove feature-test
 
 ## devcontainer あり・なし混在の確認
 
+> **注意**: `worktree-container list` はカレントディレクトリが属するリポジトリの
+> ワークツリー環境のみを表示します。別リポジトリの環境は表示されません。
+> 以下の例では同じリポジトリ内で devcontainer あり・なしのブランチを作成しています。
+
 ```bash
-# devcontainer.json のあるリポジトリに移動
 cd /path/to/repo-with-devcontainer
 
 # devcontainer 付きワークツリーを作成
 worktree-container create feature-with-dc
 
-# devcontainer なしリポジトリに移動して作成
-cd /path/to/repo-without-devcontainer
+# 同じリポジトリで devcontainer.json のないブランチを作成
+# （ブランチ上で .devcontainer を削除済みの想定）
 worktree-container create feature-no-dc
 
-# どちらのリポジトリからでも list で全環境を確認
+# 同一リポジトリ内の全環境を確認
 worktree-container list
 
 # 期待される出力:

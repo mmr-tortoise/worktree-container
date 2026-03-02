@@ -113,6 +113,17 @@ func runList(ctx context.Context, flags *listFlags) error {
 				continue // No marker file — not managed by worktree-container.
 			}
 
+			// Validate that this marker was written by worktree-container.
+			// Markers from other tools or with corrupted data are silently skipped.
+			if marker.ManagedBy != "worktree-container" {
+				VerboseLog("Warning: ignoring marker at %s with unexpected managedBy %q", wtPath, marker.ManagedBy)
+				continue
+			}
+			if marker.Name == "" {
+				VerboseLog("Warning: ignoring marker at %s with empty name", wtPath)
+				continue
+			}
+
 			// Parse the creation timestamp from the marker file.
 			createdAt, parseErr := time.Parse(time.RFC3339, marker.CreatedAt)
 			if parseErr != nil {
@@ -126,12 +137,23 @@ func runList(ctx context.Context, flags *listFlags) error {
 				configPattern = model.PatternNone
 			}
 
+			// Determine status heuristically based on config pattern.
+			// Without Docker, we cannot know the actual container state, so:
+			// - PatternNone → StatusNoContainer (no containers exist)
+			// - Any other pattern → StatusStopped (best guess; containers may
+			//   actually be running or removed, but "stopped" is the safest
+			//   assumption for marker-only lookup without Docker).
+			status := model.StatusNoContainer
+			if configPattern != model.PatternNone {
+				status = model.StatusStopped
+			}
+
 			env := &model.WorktreeEnv{
 				Name:           marker.Name,
 				Branch:         marker.Branch,
 				WorktreePath:   wtPath,
 				SourceRepoPath: marker.SourceRepoPath,
-				Status:         model.StatusNoContainer,
+				Status:         status,
 				ConfigPattern:  configPattern,
 				CreatedAt:      createdAt,
 			}
