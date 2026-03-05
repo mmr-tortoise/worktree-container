@@ -10,8 +10,11 @@ import (
 )
 
 // Label key constants define the Docker label keys used to persist
-// worktree environment metadata on containers. These labels serve as
-// the sole persistence mechanism — there is no external state file.
+// worktree environment metadata on containers. These labels work
+// alongside lightweight .loam marker files to form a dual-source
+// persistence model: labels store runtime metadata on containers,
+// while marker files enable fast environment discovery without
+// querying the Docker daemon.
 //
 // All keys share the "loam." prefix to namespace them and avoid
 // collisions with labels set by other tools (Docker Compose, VS Code, etc.).

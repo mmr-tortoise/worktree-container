@@ -307,7 +307,7 @@ type ContainerInfo struct {
 	Status string `json:"status"`
 
 	// Labels is the full set of Docker labels on the container.
-	// Includes loam management labels (worktree.* prefix).
+	// Includes loam management labels (loam.* prefix).
 	Labels map[string]string `json:"labels,omitempty"`
 }
 

@@ -14,7 +14,7 @@ Delegate work on other branches to coding agents (such as Claude Code) while con
 
 - **Zero Port Collision Guarantee** -- No port conflicts even with up to 10 environments running simultaneously. The port-shift algorithm handles all port assignments automatically
 - **All 4 devcontainer.json Patterns Supported** -- Works with image references, Dockerfile builds, single-service Compose, and multi-service Compose configurations
-- **Docker Label-Based State Management** -- No external state files needed. All metadata is dynamically discovered from Docker container labels
+- **Dual-Source State Management** -- Docker container labels store runtime metadata, while lightweight `.loam` marker files in each worktree enable fast environment discovery without querying Docker
 - **Multiple Tool Support** -- Connect from VS Code Dev Containers, Dev Container CLI, or DevPod
 - **Cross-Platform** -- Supports macOS, Linux, and Windows
 - **Non-Destructive to Original Config** -- The original project's devcontainer.json is read-only. A copy is generated in the worktree and modified there
