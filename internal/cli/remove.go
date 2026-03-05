@@ -78,14 +78,17 @@ Examples:
 // It finds the environment, optionally prompts for confirmation, removes
 // Docker resources, and optionally removes the Git worktree.
 func runRemove(ctx context.Context, envName string, flags *removeFlags) error {
-	// Step 1: Connect to Docker daemon.
+	// Step 1: Try to connect to Docker daemon.
+	// Docker connection failure is non-fatal — marker-only (PatternNone)
+	// environments can be removed without Docker.
 	cli, err := docker.NewClient()
 	if err != nil {
-		return err
+		VerboseLog("Warning: Docker not available: %v", err)
+		cli = nil
+	} else {
+		defer func() { _ = cli.Close() }()
+		VerboseLog("Connected to Docker daemon")
 	}
-	defer func() { _ = cli.Close() }()
-
-	VerboseLog("Connected to Docker daemon")
 
 	// Step 2: Find the target environment.
 	env, containers, err := findEnvironment(ctx, cli, envName)
@@ -106,28 +109,43 @@ func runRemove(ctx context.Context, envName string, flags *removeFlags) error {
 		}
 	}
 
-	// Step 4: Remove Docker containers and resources.
-	if env.ConfigPattern.IsCompose() {
-		// Pattern C/D: Use docker compose down with volume removal.
-		// This removes containers, networks, and named volumes in one operation.
-		VerboseLog("Running docker compose down for environment %q...", envName)
-
-		devcontainerDir := filepath.Join(env.WorktreePath, ".devcontainer")
-		if err := docker.ComposeDown(ctx, devcontainerDir, nil, true); err != nil {
-			return model.WrapCLIError(model.ExitGeneralError,
-				fmt.Sprintf("failed to remove environment %q containers", envName), err)
+	// Step 4: Remove Docker containers and resources (skip for PatternNone).
+	// PatternNone environments have no containers to remove — only the
+	// Git worktree cleanup in Step 5 is needed.
+	if env.ConfigPattern.RequiresDocker() {
+		// Guard against nil Docker client for non-None patterns.
+		// If Docker is not available but the environment requires containers,
+		// return a clear error instead of proceeding to panic on Docker SDK calls.
+		if cli == nil {
+			return model.WrapCLIError(model.ExitDockerNotRunning,
+				fmt.Sprintf("Docker is required to remove environment %q (pattern: %s) but is not available",
+					envName, env.ConfigPattern), nil)
 		}
-	} else {
-		// Pattern A/B: Stop and remove each container individually.
-		VerboseLog("Removing %d container(s) for environment %q...", len(containers), envName)
-		for _, c := range containers {
-			VerboseLog("Removing container %s (%s)...", c.ContainerName, c.ContainerID[:12])
-			// Use force=true to handle containers that might still be running.
-			if err := docker.RemoveContainer(ctx, cli, c.ContainerID, true); err != nil {
+
+		if env.ConfigPattern.IsCompose() {
+			// Pattern C/D: Use docker compose down with volume removal.
+			// This removes containers, networks, and named volumes in one operation.
+			VerboseLog("Running docker compose down for environment %q...", envName)
+
+			devcontainerDir := filepath.Join(env.WorktreePath, ".devcontainer")
+			if err := docker.ComposeDown(ctx, devcontainerDir, nil, true); err != nil {
 				return model.WrapCLIError(model.ExitGeneralError,
-					fmt.Sprintf("failed to remove container %q", c.ContainerName), err)
+					fmt.Sprintf("failed to remove environment %q containers", envName), err)
+			}
+		} else {
+			// Pattern A/B: Stop and remove each container individually.
+			VerboseLog("Removing %d container(s) for environment %q...", len(containers), envName)
+			for _, c := range containers {
+				VerboseLog("Removing container %s (%s)...", c.ContainerName, c.ContainerID[:12])
+				// Use force=true to handle containers that might still be running.
+				if err := docker.RemoveContainer(ctx, cli, c.ContainerID, true); err != nil {
+					return model.WrapCLIError(model.ExitGeneralError,
+						fmt.Sprintf("failed to remove container %q", c.ContainerName), err)
+				}
 			}
 		}
+	} else {
+		VerboseLog("No containers to remove for environment %q (PatternNone)", envName)
 	}
 
 	// Step 5: Optionally remove the Git worktree.

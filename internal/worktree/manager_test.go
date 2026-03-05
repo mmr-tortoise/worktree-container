@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/mmr-tortoise/worktree-container/internal/model"
 )
 
 // setupTestRepo creates a temporary directory with an initialized Git repository
@@ -56,6 +58,64 @@ func runTestGit(t *testing.T, dir string, args ...string) string {
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, "git %v failed: %s", args, string(output))
 	return string(output)
+}
+
+// --- MarkerFile tests ---
+
+// TestWriteAndReadMarkerFile verifies the round-trip of writing and reading
+// a marker file. All fields should be preserved exactly.
+func TestWriteAndReadMarkerFile(t *testing.T) {
+	dir := t.TempDir()
+
+	original := MarkerFile{
+		ManagedBy:      "worktree-container",
+		Name:           "feature-auth",
+		Branch:         "feature/auth",
+		SourceRepoPath: "/path/to/repo",
+		ConfigPattern:  model.PatternNone,
+		CreatedAt:      "2026-03-02T00:00:00Z",
+	}
+
+	// Write the marker file.
+	err := WriteMarkerFile(dir, original)
+	require.NoError(t, err, "WriteMarkerFile should succeed")
+
+	// Read it back and verify all fields match.
+	read, err := ReadMarkerFile(dir)
+	require.NoError(t, err, "ReadMarkerFile should succeed")
+	require.NotNil(t, read, "ReadMarkerFile should return a non-nil marker")
+
+	assert.Equal(t, original.ManagedBy, read.ManagedBy)
+	assert.Equal(t, original.Name, read.Name)
+	assert.Equal(t, original.Branch, read.Branch)
+	assert.Equal(t, original.SourceRepoPath, read.SourceRepoPath)
+	assert.Equal(t, original.ConfigPattern, read.ConfigPattern)
+	assert.Equal(t, original.CreatedAt, read.CreatedAt)
+}
+
+// TestReadMarkerFile_NotFound verifies that reading from a directory without
+// a marker file returns nil, nil (not an error).
+func TestReadMarkerFile_NotFound(t *testing.T) {
+	dir := t.TempDir()
+
+	marker, err := ReadMarkerFile(dir)
+	assert.NoError(t, err, "ReadMarkerFile should not error for missing file")
+	assert.Nil(t, marker, "ReadMarkerFile should return nil for missing file")
+}
+
+// TestReadMarkerFile_InvalidJSON verifies that a marker file with invalid
+// JSON content returns an error.
+func TestReadMarkerFile_InvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write invalid JSON to the marker file path.
+	markerPath := filepath.Join(dir, MarkerFileName)
+	err := os.WriteFile(markerPath, []byte("{invalid json}"), 0644)
+	require.NoError(t, err)
+
+	marker, err := ReadMarkerFile(dir)
+	assert.Error(t, err, "ReadMarkerFile should error for invalid JSON")
+	assert.Nil(t, marker, "ReadMarkerFile should return nil for invalid JSON")
 }
 
 // TestAdd verifies that Manager.Add creates a new worktree with a new branch.
@@ -405,4 +465,50 @@ detached
 func TestParsePorcelainOutputEmpty(t *testing.T) {
 	result := parsePorcelainOutput("")
 	assert.Empty(t, result, "empty input should produce empty result")
+}
+
+// TestListPaths verifies that ListPaths returns the filesystem paths of all
+// non-bare worktrees, including the main repository and any additional
+// worktrees created via Add().
+func TestListPaths(t *testing.T) {
+	repoPath := setupTestRepo(t)
+	m := NewManager()
+
+	// Create two additional worktrees.
+	wt1 := filepath.Join(t.TempDir(), "wt-paths-1")
+	wt2 := filepath.Join(t.TempDir(), "wt-paths-2")
+
+	err := m.Add(repoPath, "paths-branch-1", wt1, "")
+	require.NoError(t, err)
+
+	err = m.Add(repoPath, "paths-branch-2", wt2, "")
+	require.NoError(t, err)
+
+	// ListPaths should return main repo + 2 worktrees = 3 paths.
+	paths, err := m.ListPaths(repoPath)
+	require.NoError(t, err)
+	assert.Len(t, paths, 3, "should return main repo + 2 worktree paths")
+
+	// Resolve symlinks for comparison (macOS /var → /private/var).
+	resolvedRepo, _ := filepath.EvalSymlinks(repoPath)
+	resolvedWT1, _ := filepath.EvalSymlinks(wt1)
+	resolvedWT2, _ := filepath.EvalSymlinks(wt2)
+
+	assert.Contains(t, paths, resolvedRepo, "should include main repo path")
+	assert.Contains(t, paths, resolvedWT1, "should include worktree 1 path")
+	assert.Contains(t, paths, resolvedWT2, "should include worktree 2 path")
+}
+
+// TestListPaths_MainOnly verifies that ListPaths returns only the main
+// repository path when no additional worktrees have been created.
+func TestListPaths_MainOnly(t *testing.T) {
+	repoPath := setupTestRepo(t)
+	m := NewManager()
+
+	paths, err := m.ListPaths(repoPath)
+	require.NoError(t, err)
+	assert.Len(t, paths, 1, "should return only the main repo path")
+
+	resolvedRepo, _ := filepath.EvalSymlinks(repoPath)
+	assert.Equal(t, resolvedRepo, paths[0], "the single path should be the main repo")
 }
